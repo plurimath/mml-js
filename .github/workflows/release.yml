@@ -106,5 +106,22 @@ jobs:
             npm version "$VERSION" --no-git-tag-version
           fi
 
+      # A dispatch can name a version already on npm (for example after an
+      # mml release with next_version=skip); npm refuses to republish one,
+      # so that case ends here as a success instead of a failed publish.
+      - name: Skip a version already on npm
+        id: published
+        run: |
+          set -eu
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "@plurimath/mml@$VERSION" version 2>/dev/null | grep -qxF "$VERSION"; then
+            echo "@plurimath/mml@$VERSION is already on npm; skipping publish"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "@plurimath/mml@$VERSION is not on npm; publishing"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish to npm (Trusted Publisher — passwordless OIDC)
+        if: steps.published.outputs.skip != 'true'
         run: npm publish --provenance --access public
