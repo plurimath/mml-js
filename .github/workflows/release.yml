@@ -111,15 +111,29 @@ jobs:
       # so that case ends here as a success instead of a failed publish.
       - name: Skip a version already on npm
         id: published
+        # Only npm's E404 means "not published"; any other failure
+        # (network, registry, auth) stops the job rather than publishing
+        # blind.
         run: |
           set -eu
           VERSION=$(node -p "require('./package.json').version")
-          if npm view "@plurimath/mml@$VERSION" version 2>/dev/null | grep -qxF "$VERSION"; then
-            echo "@plurimath/mml@$VERSION is already on npm; skipping publish"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
+          if OUT=$(npm view "@plurimath/mml@$VERSION" version --json 2>/dev/null); then
+            FOUND=$(printf '%s' "$OUT" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const v=JSON.parse(s||"null");process.stdout.write(String(Array.isArray(v)?v.join(" "):v))})')
+            if [ "$FOUND" = "$VERSION" ]; then
+              echo "@plurimath/mml@$VERSION is already on npm; skipping publish"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            printf '::error::npm view returned an unexpected version for %q: %q\n' "$VERSION" "$FOUND"
+            exit 1
+          fi
+          CODE=$(printf '%s' "$OUT" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(String(JSON.parse(s).error.code))}catch{process.stdout.write("unparseable")}})')
+          if [ "$CODE" = "E404" ]; then
             echo "@plurimath/mml@$VERSION is not on npm; publishing"
             echo "skip=false" >> "$GITHUB_OUTPUT"
+          else
+            printf '::error::npm view failed for %q with code %q; not publishing\n' "$VERSION" "$CODE"
+            exit 1
           fi
 
       - name: Publish to npm (Trusted Publisher — passwordless OIDC)
