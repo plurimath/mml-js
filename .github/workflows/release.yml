@@ -118,7 +118,7 @@ jobs:
           set -eu
           VERSION=$(node -p "require('./package.json').version")
           if OUT=$(npm view "@plurimath/mml@$VERSION" version --json 2>/dev/null); then
-            FOUND=$(printf '%s' "$OUT" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const v=JSON.parse(s||"null");process.stdout.write(String(Array.isArray(v)?v.join(" "):v))})')
+            FOUND=$(printf '%s' "$OUT" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const v=JSON.parse(s||"null");process.stdout.write(String(Array.isArray(v)?v.join(" "):v))}catch{process.stdout.write("unparseable")}})')
             if [ "$FOUND" = "$VERSION" ]; then
               echo "@plurimath/mml@$VERSION is already on npm; skipping publish"
               echo "skip=true" >> "$GITHUB_OUTPUT"
