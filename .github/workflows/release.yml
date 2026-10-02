@@ -21,6 +21,10 @@ on:
         description: "Version to publish (x.y.z, major, minor, patch, skip)"
         required: true
         default: 'skip'
+      ruby_ref:
+        description: "plurimath/mml ref to build (empty: the pinned MML_REF)"
+        required: false
+        default: ''
   repository_dispatch:
     types: [ do-release ]
 
@@ -32,12 +36,33 @@ jobs:
 
       - name: Resolve version
         id: ver
+        # The dispatch payload and input reach the script only through
+        # env, and the version is validated before it is used.
+        env:
+          PAYLOAD_VERSION: ${{ github.event.client_payload.version }}
+          INPUT_VERSION: ${{ github.event.inputs.next_version }}
+          PAYLOAD_RUBY_REF: ${{ github.event.client_payload.ruby_ref }}
+          INPUT_RUBY_REF: ${{ github.event.inputs.ruby_ref }}
         run: |
-          VERSION="${{ github.event.client_payload.version || github.event.inputs.next_version }}"
+          VERSION="${PAYLOAD_VERSION:-$INPUT_VERSION}"
           if [ -z "$VERSION" ] || [ "$VERSION" = "skip" ]; then
             VERSION=$(node -p "require('./package.json').version")
           fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if ! [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?|major|minor|patch)$ ]]; then
+            echo "::error::invalid version: $VERSION"
+            exit 1
+          fi
+          # Empty unless the dispatch or input names an mml ref; build.js
+          # then uses its pinned MML_REF.
+          RUBY_REF="${PAYLOAD_RUBY_REF:-$INPUT_RUBY_REF}"
+          if [ -n "$RUBY_REF" ] && { ! [[ "$RUBY_REF" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$ ]] || [[ "$RUBY_REF" == *..* ]]; }; then
+            echo "::error::invalid ruby_ref: $RUBY_REF"
+            exit 1
+          fi
+          {
+            echo "version=$VERSION"
+            echo "ruby_ref=$RUBY_REF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -65,16 +90,18 @@ jobs:
       - name: Build
         run: node scripts/build.js
         env:
-          VERSION: ${{ steps.ver.outputs.version }}
-          RUBY_REF: ${{ github.event.client_payload.ruby_ref || format('v{0}', steps.ver.outputs.version) }}
+          RUBY_REF: ${{ steps.ver.outputs.ruby_ref }}
           OPAL_PREFORK_DISABLE: "1"
 
       - name: Smoke test
-        run: node scripts/test.js
+        run: |
+          node scripts/test.js
+          VARIANT=external node scripts/test.js
 
       - name: Set package version
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          VERSION="${{ steps.ver.outputs.version }}"
           if [ "$VERSION" != "$(node -p "require('./package.json').version")" ]; then
             npm version "$VERSION" --no-git-tag-version
           fi
