@@ -13,8 +13,8 @@ npm install @plurimath/mml
 
 | Entry | File | Use case |
 |---|---|---|
-| \`mml\` (default) | \`dist/mml.js\` | **Self-contained** — Opal runtime embedded. CDN-friendly. |
-| \`mml-no-opal\` | \`dist/mml-no-opal.js\` | **External** — references \`@lutaml/opal-runtime\` global. For bundler users who share runtime. |
+| \`mml\` (default) | \`dist/mml.js\` | **Self-contained** — Opal runtime and \`@lutaml/lutaml-model\` embedded. CDN-friendly. |
+| \`mml-no-opal\` | \`dist/mml-no-opal.js\` | **External** — load \`@lutaml/opal-runtime\`, then \`@lutaml/lutaml-model\`, then this file. For bundler users who share runtime. |
 
 ## Shared runtime
 
@@ -25,6 +25,14 @@ it to share the Opal instance across multiple Opal-compiled packages
 \`\`\`sh
 npm install @plurimath/mml @lutaml/opal-runtime
 \`\`\`
+
+## Dependencies
+
+- \`@lutaml/lutaml-model\` \`^0.1.1\` is a required peer.
+- The build needs \`lib/mml/opal.rb\` from plurimath/mml. \`scripts/build.js\`
+  builds the latest mml release on RubyGems unless \`RUBY_REF\` (and
+  \`RUBY_REPO\`) names another ref, and stops with an error when the ref
+  lacks the file.
 
 ## Source
 

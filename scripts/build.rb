@@ -10,36 +10,13 @@ require "opal"
 require "opal/builder"
 require "fileutils"
 
-# Deps of mml that cannot be Opal-compiled directly:
-# - lutaml-model: Opal runtime unverified upstream (continue-on-error
-#   in their opal.yml). Stub for now; remove when @lutaml/lutaml-model
-#   ships as npm peer.
-# - ox, nokogiri: server-only XML adapters. moxml picks oga under Opal.
-# - moxml: has its own Opal boot file; loaded separately as prerequired
-#   when @lutaml/moxml ships.
-UPSTREAM_STUBS = %w[
-  lutaml/model
-  lutaml/model/xml
-  lutaml/model/json
-  lutaml/model/yaml
-  lutaml/model/key_value
-  lutaml/model/toml
-  lutaml/model/type
-  lutaml/model/serialize
-  ox
-  nokogiri
-  oga
-  moxml
-  moxml/compat/opal/moxml_boot
-].freeze
-
 ENTRY = "mml/opal"
 
 def build_app_code(ruby_dir, dist_dir)
   builder = Opal::Builder.new
   builder.append_paths(File.join(ruby_dir, "lib"))
-  builder.stubs = UPSTREAM_STUBS.dup
-  builder.prerequired = %w[opal]
+  # @lutaml/lutaml-model loads lutaml/model before this bundle.
+  builder.prerequired = %w[opal lutaml/model]
   builder.compiler_options = { source_map: false }
 
   output = builder.build(ENTRY).to_s
@@ -50,31 +27,25 @@ def build_app_code(ruby_dir, dist_dir)
   output
 end
 
-def read_runtime(runtime_pkg_root)
-  candidates = [
-    File.join(runtime_pkg_root, "node_modules", "@lutaml", "opal-runtime", "dist", "runtime.js"),
-    File.join(runtime_pkg_root, "node_modules", "@lutaml", "opal-runtime", "dist", "runtime.cjs"),
-  ]
-  candidates.each do |p|
+def read_dist_file(pkg_root, pkg, files)
+  files.each do |f|
+    p = File.join(pkg_root, "node_modules", *pkg.split("/"), "dist", f)
     next unless File.exist?(p)
 
-    runtime = File.read(p)
-    warn "read runtime from #{p} (#{runtime.bytesize / 1024} KiB)"
-    return runtime
+    js = File.read(p)
+    warn "read #{pkg} from #{p} (#{js.bytesize / 1024} KiB)"
+    return js
   end
-  warn "Could not locate @lutaml/opal-runtime/dist/runtime.js. " \
-       "Self-contained flavor will be empty."
-  ""
+  abort "Could not locate #{pkg}/dist/#{files.first}; run npm install first"
 end
 
-def build_self_contained(app_code, runtime, version, dist_dir)
+def build_self_contained(runtime, lutaml_model, app_code, ref, dist_dir)
   header = <<~HEADER
-    // @plurimath/mml — self-contained build (Opal runtime embedded)
-    // Generated from plurimath/mml v#{version}
-    // Opal runtime: @lutaml/opal-runtime
+    // @plurimath/mml — self-contained build (Opal runtime and lutaml-model embedded)
+    // Generated from plurimath/mml #{ref}
     //
   HEADER
-  combined = "#{header}#{runtime}\n#{app_code}"
+  combined = "#{header}#{runtime}\n#{lutaml_model}\n#{app_code}"
   path = File.join(dist_dir, "mml.js")
   File.write(path, combined)
   warn "wrote #{path} (#{combined.bytesize / 1024} KiB)"
@@ -94,11 +65,13 @@ end
 ruby_dir = ENV.fetch("RUBY_DIR")
 dist_dir = ENV.fetch("DIST_DIR")
 runtime_root = ENV.fetch("RUNTIME_PKG_ROOT")
-version = ENV.fetch("VERSION")
+ref = ENV.fetch("RUBY_REF")
 
 FileUtils.mkdir_p(dist_dir)
 
 app_code = build_app_code(ruby_dir, dist_dir)
-runtime = read_runtime(runtime_root)
-build_self_contained(app_code, runtime, version, dist_dir)
+runtime = read_dist_file(runtime_root, "@lutaml/opal-runtime", %w[runtime.js runtime.cjs])
+# The no-opal build, so the bundle carries exactly one Opal runtime.
+lutaml_model = read_dist_file(runtime_root, "@lutaml/lutaml-model", %w[lutaml-model-no-opal.js])
+build_self_contained(runtime, lutaml_model, app_code, ref, dist_dir)
 write_types(dist_dir)

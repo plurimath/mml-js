@@ -21,6 +21,9 @@ on:
         description: "Version to publish (x.y.z, major, minor, patch, skip)"
         required: true
         default: 'skip'
+      ruby_ref:
+        description: Override the Ruby ref to build from (branch/tag/SHA). Defaults to the latest mml release on RubyGems.
+        required: false
   repository_dispatch:
     types: [ do-release ]
 
@@ -32,12 +35,23 @@ jobs:
 
       - name: Resolve version
         id: ver
+        env:
+          PAYLOAD_VERSION: ${{ github.event.client_payload.version }}
+          INPUT_VERSION: ${{ github.event.inputs.next_version }}
+          RUBY_REF: ${{ github.event.client_payload.ruby_ref || github.event.inputs.ruby_ref }}
         run: |
-          VERSION="${{ github.event.client_payload.version || github.event.inputs.next_version }}"
+          VERSION="${PAYLOAD_VERSION:-$INPUT_VERSION}"
           if [ -z "$VERSION" ] || [ "$VERSION" = "skip" ]; then
             VERSION=$(node -p "require('./package.json').version")
           fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # A leading "-" would reach `npm version` as an option; a
+          # newline would add a line to $GITHUB_OUTPUT.
+          [[ "$VERSION" != -* && "$VERSION" != *$'\n'* ]] || { echo "::error::invalid version"; exit 1; }
+          [[ "$RUBY_REF" != *$'\n'* ]] || { echo "::error::invalid ruby_ref"; exit 1; }
+          {
+            echo "version=$VERSION"
+            echo "ruby_ref=$RUBY_REF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -65,16 +79,18 @@ jobs:
       - name: Build
         run: node scripts/build.js
         env:
-          VERSION: ${{ steps.ver.outputs.version }}
-          RUBY_REF: ${{ github.event.client_payload.ruby_ref || format('v{0}', steps.ver.outputs.version) }}
+          RUBY_REF: ${{ steps.ver.outputs.ruby_ref }}
           OPAL_PREFORK_DISABLE: "1"
 
       - name: Smoke test
-        run: node scripts/test.js
+        run: |
+          node scripts/test.js
+          VARIANT=external node scripts/test.js
 
       - name: Set package version
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          VERSION="${{ steps.ver.outputs.version }}"
           if [ "$VERSION" != "$(node -p "require('./package.json').version")" ]; then
             npm version "$VERSION" --no-git-tag-version
           fi
