@@ -16,8 +16,6 @@ const RUBY_REF = process.env.RUBY_REF || `v${latestGemVersion("mml")}`;
 const RUBY_REPO =
   process.env.RUBY_REPO || "https://github.com/plurimath/mml.git";
 
-// Arguments are passed as an array with no shell, so RUBY_REF and
-// RUBY_REPO are never parsed as shell syntax.
 function run(cmd, args, opts = {}) {
   const line = [cmd, ...args].join(" ");
   console.error(`$ ${line}`);
