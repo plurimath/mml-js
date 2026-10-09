@@ -38,8 +38,7 @@ jobs:
         env:
           PAYLOAD_VERSION: ${{ github.event.client_payload.version }}
           INPUT_VERSION: ${{ github.event.inputs.next_version }}
-          PAYLOAD_RUBY_REF: ${{ github.event.client_payload.ruby_ref }}
-          INPUT_RUBY_REF: ${{ github.event.inputs.ruby_ref }}
+          RUBY_REF: ${{ github.event.client_payload.ruby_ref || github.event.inputs.ruby_ref }}
         run: |
           VERSION="${PAYLOAD_VERSION:-$INPUT_VERSION}"
           if [ -z "$VERSION" ] || [ "$VERSION" = "skip" ]; then
@@ -48,7 +47,6 @@ jobs:
           # A leading "-" would reach `npm version` as an option; a
           # newline would add a line to $GITHUB_OUTPUT.
           [[ "$VERSION" != -* && "$VERSION" != *$'\n'* ]] || { echo "::error::invalid version"; exit 1; }
-          RUBY_REF="${PAYLOAD_RUBY_REF:-$INPUT_RUBY_REF}"
           [[ "$RUBY_REF" != *$'\n'* ]] || { echo "::error::invalid ruby_ref"; exit 1; }
           {
             echo "version=$VERSION"
