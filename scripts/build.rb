@@ -10,23 +10,13 @@ require "opal"
 require "opal/builder"
 require "fileutils"
 
-# Deps of mml that cannot be Opal-compiled directly:
-# - ox, nokogiri: server-only XML adapters. moxml picks oga under Opal.
-UPSTREAM_STUBS = %w[
-  ox
-  nokogiri
-].freeze
-
 ENTRY = "mml/opal"
 
 def build_app_code(ruby_dir, dist_dir)
   builder = Opal::Builder.new
   builder.append_paths(File.join(ruby_dir, "lib"))
-  builder.stubs = UPSTREAM_STUBS.dup
-  # lutaml-model, moxml and oga are left unresolved: @lutaml/lutaml-model
-  # defines them before this bundle loads.
-  builder.missing_require_severity = :ignore
-  builder.prerequired = %w[opal]
+  # @lutaml/lutaml-model loads lutaml/model before this bundle.
+  builder.prerequired = %w[opal lutaml/model]
   builder.compiler_options = { source_map: false }
 
   output = builder.build(ENTRY).to_s
