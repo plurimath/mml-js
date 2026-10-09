@@ -30,7 +30,6 @@ UPSTREAM_STUBS = %w[
   moxml/compat/opal/moxml_boot
 ].freeze
 
-# A stub definition for a module @lutaml/lutaml-model provides.
 PROVIDER_STUB =
   /Opal\.modules\["(?:lutaml|moxml|oga)(?:\/[^"]*)?"\]\s*=\s*Opal\.return_val\(Opal\.nil\)/
 

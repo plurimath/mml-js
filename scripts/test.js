@@ -15,7 +15,6 @@ function resolveOrExit(spec) {
   }
 }
 
-// Load order: Opal runtime, then lutaml-model, then mml.
 const files =
   variant === "external"
     ? [
