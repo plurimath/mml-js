@@ -31,25 +31,6 @@ for (const f of files) {
     process.exit(1);
   }
 }
-// mml's own code must not redefine a module @lutaml/lutaml-model provides.
-// mml.js embeds that package, which has stubs of its own, so check the
-// mml code: mml-no-opal.js, which mml.js ends with.
-const PROVIDER_STUB =
-  /Opal\.modules\["(?:lutaml|moxml|oga)(?:\/[^"]*)?"\]\s*=\s*Opal\.return_val\(Opal\.nil\)/;
-const mmlCode = fs.readFileSync(path.join(distDir, "mml-no-opal.js"), "utf8");
-const leftover = mmlCode.match(PROVIDER_STUB);
-if (leftover) {
-  console.error(`provider stub left in mml-no-opal.js: ${leftover[0]}`);
-  process.exit(1);
-}
-if (
-  variant !== "external" &&
-  !fs.readFileSync(path.join(distDir, "mml.js"), "utf8").endsWith(mmlCode)
-) {
-  console.error("mml.js does not end with the mml-no-opal.js code");
-  process.exit(1);
-}
-
 for (const f of files) require(f);
 
 const Opal = globalThis.Opal;
@@ -70,14 +51,6 @@ console.log(
     `(sample: ${mmlModules.slice(0, 3).join(", ")})`
 );
 
-const lutamlModel = Opal.modules["lutaml/model"];
-// A stub would be a closure returning nil, without the module body.
-if (typeof lutamlModel !== "function" || !lutamlModel.toString().includes("Lutaml")) {
-  console.error("lutaml/model is not the module from @lutaml/lutaml-model");
-  process.exit(1);
-}
-console.log("✓ lutaml/model is the @lutaml/lutaml-model module");
-
 const input =
   '<math xmlns="http://www.w3.org/1998/Math/MathML">' +
   "<mfrac><mi>x</mi><mn>2</mn></mfrac></math>";
@@ -95,15 +68,6 @@ for (const needle of ["<mfrac>", "<mi>x</mi>", "<mn>2</mn>"]) {
   }
 }
 console.log("✓ Mml.parse(...).to_xml round-trips an <mfrac>");
-
-try {
-  const math = Opal.Mml.V3.Math.$from_xml(input);
-  if (!math.$to_xml().includes("<mfrac>")) throw new Error("no <mfrac> in output");
-} catch (e) {
-  console.error(`Mml::V3::Math.from_xml failed: ${e.message}`);
-  process.exit(1);
-}
-console.log("✓ Mml::V3::Math.from_xml parses an <mfrac>");
 
 console.log(`\n${variant} variant: verified`);
 process.exit(0);

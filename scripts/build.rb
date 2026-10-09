@@ -10,28 +10,12 @@ require "opal"
 require "opal/builder"
 require "fileutils"
 
-# Requires that resolve outside this bundle:
-# - lutaml-model, moxml, oga: compiled by @lutaml/lutaml-model, which is
-#   loaded before this bundle (embedded in the self-contained flavor).
+# Deps of mml that cannot be Opal-compiled directly:
 # - ox, nokogiri: server-only XML adapters. moxml picks oga under Opal.
 UPSTREAM_STUBS = %w[
-  lutaml/model
-  lutaml/model/xml
-  lutaml/model/json
-  lutaml/model/yaml
-  lutaml/model/key_value
-  lutaml/model/toml
-  lutaml/model/type
-  lutaml/model/serialize
   ox
   nokogiri
-  oga
-  moxml
-  moxml/compat/opal/moxml_boot
 ].freeze
-
-PROVIDER_STUB =
-  /Opal\.modules\["(?:lutaml|moxml|oga)(?:\/[^"]*)?"\]\s*=\s*Opal\.return_val\(Opal\.nil\)/
 
 ENTRY = "mml/opal"
 
@@ -39,13 +23,13 @@ def build_app_code(ruby_dir, dist_dir)
   builder = Opal::Builder.new
   builder.append_paths(File.join(ruby_dir, "lib"))
   builder.stubs = UPSTREAM_STUBS.dup
+  # lutaml-model, moxml and oga are left unresolved: @lutaml/lutaml-model
+  # defines them before this bundle loads.
+  builder.missing_require_severity = :ignore
   builder.prerequired = %w[opal]
   builder.compiler_options = { source_map: false }
 
-  # A stub compiles to `Opal.modules[name] = Opal.return_val(Opal.nil)`,
-  # which would replace the real module @lutaml/lutaml-model already
-  # defined. Drop the stub definitions for modules that package provides.
-  output = builder.build(ENTRY).to_s.gsub(/#{PROVIDER_STUB.source};?/, "")
+  output = builder.build(ENTRY).to_s
   path = File.join(dist_dir, "mml-no-opal.js")
   FileUtils.mkdir_p(dist_dir)
   File.write(path, output)
