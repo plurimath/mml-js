@@ -28,14 +28,13 @@ npm install @plurimath/mml @lutaml/opal-runtime
 
 ## Dependencies
 
-- `@lutaml/lutaml-model` `^0.2.0` is a required peer. 0.2.0 is not
-  published yet; it must be published before this package can be
-  installed or released.
+- `@lutaml/lutaml-model` `^0.1.1` is a required peer.
 - The build needs `lib/mml/opal.rb` from plurimath/mml, which no mml
-  release has yet. `scripts/build.js` builds `MML_REF` by default and
-  stops with an error when that ref lacks the file. Until mml publishes
-  it, build with `RUBY_REF` (and `RUBY_REPO`) pointing at a ref that has
-  it, and run a release with the `ruby_ref` input set to such a ref.
+  release has yet. `scripts/build.js` builds the latest mml release on
+  RubyGems by default and stops with an error when that ref lacks the
+  file. Until mml publishes it, build with `RUBY_REF` (and `RUBY_REPO`)
+  pointing at a ref that has it, and run a release with the `ruby_ref`
+  input set to such a ref.
 
 ## Source
 
