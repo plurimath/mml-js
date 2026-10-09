@@ -49,7 +49,7 @@ function checkoutMmlRuby() {
     run("git", ["-C", TMP, "fetch", "--depth", "1", "origin", RUBY_REF]);
     run("git", ["-C", TMP, "checkout", "FETCH_HEAD"]);
   } else {
-    run("git", ["clone", "--depth", "1", "--branch", RUBY_REF, "--", RUBY_REPO, TMP]);
+    run("git", ["clone", "--depth", "1", "--branch", RUBY_REF, RUBY_REPO, TMP]);
   }
   if (!fs.existsSync(path.join(TMP, "lib", "mml", "opal.rb"))) {
     console.error(
