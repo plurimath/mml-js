@@ -61,11 +61,9 @@ try {
   console.error(`parse/serialize failed: ${e.message}`);
   process.exit(1);
 }
-for (const needle of ["<mfrac>", "<mi>x</mi>", "<mn>2</mn>"]) {
-  if (!output.includes(needle)) {
-    console.error(`round trip lost ${needle}:\n${output}`);
-    process.exit(1);
-  }
+if (output !== input) {
+  console.error(`round trip changed the document:\n${output}`);
+  process.exit(1);
 }
 console.log("✓ Mml.parse(...).to_xml round-trips an <mfrac>");
 
