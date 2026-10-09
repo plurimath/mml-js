@@ -22,7 +22,7 @@ on:
         required: true
         default: 'skip'
       ruby_ref:
-        description: "plurimath/mml ref to build (empty: the pinned MML_REF)"
+        description: "plurimath/mml ref to build (empty: the latest mml release on RubyGems)"
         required: false
         default: ''
   repository_dispatch:
@@ -53,7 +53,7 @@ jobs:
             exit 1
           fi
           # Empty unless the dispatch or input names an mml ref; build.js
-          # then uses its pinned MML_REF.
+          # then uses the latest mml release on RubyGems.
           RUBY_REF="${PAYLOAD_RUBY_REF:-$INPUT_RUBY_REF}"
           if [ -n "$RUBY_REF" ] && { ! [[ "$RUBY_REF" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$ ]] || [[ "$RUBY_REF" == *..* ]]; }; then
             echo "::error::invalid ruby_ref: $RUBY_REF"
