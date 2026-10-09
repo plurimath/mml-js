@@ -36,8 +36,6 @@ jobs:
 
       - name: Resolve version
         id: ver
-        # The dispatch payload and input reach the script only through
-        # env, and the version is validated before it is used.
         env:
           PAYLOAD_VERSION: ${{ github.event.client_payload.version }}
           INPUT_VERSION: ${{ github.event.inputs.next_version }}
@@ -52,13 +50,9 @@ jobs:
             echo "::error::invalid version: $VERSION"
             exit 1
           fi
-          # Empty unless the dispatch or input names an mml ref; build.js
-          # then uses the latest mml release on RubyGems.
           RUBY_REF="${PAYLOAD_RUBY_REF:-$INPUT_RUBY_REF}"
-          if [ -n "$RUBY_REF" ] && { ! [[ "$RUBY_REF" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$ ]] || [[ "$RUBY_REF" == *..* ]]; }; then
-            echo "::error::invalid ruby_ref: $RUBY_REF"
-            exit 1
-          fi
+          # A newline would add a line to $GITHUB_OUTPUT.
+          [[ "$RUBY_REF" != *$'\n'* ]] || { echo "::error::invalid ruby_ref"; exit 1; }
           {
             echo "version=$VERSION"
             echo "ruby_ref=$RUBY_REF"
