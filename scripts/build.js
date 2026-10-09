@@ -43,7 +43,16 @@ function ensureDir(p) { fs.mkdirSync(p, { recursive: true }); }
 function checkoutMmlRuby() {
   rmrf(TMP);
   ensureDir(TMP);
-  run("git", ["clone", "--depth", "1", "--branch", RUBY_REF, "--", RUBY_REPO, TMP]);
+  // git clone --branch only accepts branch/tag names, not SHAs; a SHA
+  // is fetched directly instead.
+  if (/^[0-9a-f]{40}$/i.test(RUBY_REF)) {
+    run("git", ["init", TMP]);
+    run("git", ["-C", TMP, "remote", "add", "origin", RUBY_REPO]);
+    run("git", ["-C", TMP, "fetch", "--depth", "1", "origin", RUBY_REF]);
+    run("git", ["-C", TMP, "checkout", "FETCH_HEAD"]);
+  } else {
+    run("git", ["clone", "--depth", "1", "--branch", RUBY_REF, "--", RUBY_REPO, TMP]);
+  }
   if (!fs.existsSync(path.join(TMP, "lib", "mml", "opal.rb"))) {
     console.error(
       `mml ${RUBY_REF} has no lib/mml/opal.rb (the Opal entry point); ` +
