@@ -22,9 +22,8 @@ on:
         required: true
         default: 'skip'
       ruby_ref:
-        description: "plurimath/mml ref to build (empty: the latest mml release on RubyGems)"
+        description: Override the Ruby ref to build from (branch/tag/SHA). Defaults to the latest mml release on RubyGems.
         required: false
-        default: ''
   repository_dispatch:
     types: [ do-release ]
 
@@ -46,12 +45,10 @@ jobs:
           if [ -z "$VERSION" ] || [ "$VERSION" = "skip" ]; then
             VERSION=$(node -p "require('./package.json').version")
           fi
-          if ! [[ "$VERSION" =~ ^((0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*)(\.(0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*))*))?(\+([0-9a-zA-Z-]+(\.[0-9a-zA-Z-]+)*))?|major|minor|patch)$ ]]; then
-            echo "::error::invalid version: $VERSION"
-            exit 1
-          fi
+          # A leading "-" would reach `npm version` as an option; a
+          # newline would add a line to $GITHUB_OUTPUT.
+          [[ "$VERSION" != -* && "$VERSION" != *$'\n'* ]] || { echo "::error::invalid version"; exit 1; }
           RUBY_REF="${PAYLOAD_RUBY_REF:-$INPUT_RUBY_REF}"
-          # A newline would add a line to $GITHUB_OUTPUT.
           [[ "$RUBY_REF" != *$'\n'* ]] || { echo "::error::invalid ruby_ref"; exit 1; }
           {
             echo "version=$VERSION"
@@ -100,36 +97,5 @@ jobs:
             npm version "$VERSION" --no-git-tag-version
           fi
 
-      # A dispatch can name a version already on npm (for example after an
-      # mml release with next_version=skip); npm refuses to republish one,
-      # so that case ends here as a success instead of a failed publish.
-      - name: Skip a version already on npm
-        id: published
-        # Only npm's E404 means "not published"; any other failure
-        # (network, registry, auth) stops the job rather than publishing
-        # blind.
-        run: |
-          set -eu
-          VERSION=$(node -p "require('./package.json').version")
-          if OUT=$(npm view "@plurimath/mml@$VERSION" version --json 2>/dev/null); then
-            FOUND=$(printf '%s' "$OUT" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const v=JSON.parse(s||"null");process.stdout.write(String(Array.isArray(v)?v.join(" "):v))}catch{process.stdout.write("unparseable")}})')
-            if [ "$FOUND" = "$VERSION" ]; then
-              echo "@plurimath/mml@$VERSION is already on npm; skipping publish"
-              echo "skip=true" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            printf '::error::npm view returned an unexpected version for %q: %q\n' "$VERSION" "$FOUND"
-            exit 1
-          fi
-          CODE=$(printf '%s' "$OUT" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(String(JSON.parse(s).error.code))}catch{process.stdout.write("unparseable")}})')
-          if [ "$CODE" = "E404" ]; then
-            echo "@plurimath/mml@$VERSION is not on npm; publishing"
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          else
-            printf '::error::npm view failed for %q with code %q; not publishing\n' "$VERSION" "$CODE"
-            exit 1
-          fi
-
       - name: Publish to npm (Trusted Publisher — passwordless OIDC)
-        if: steps.published.outputs.skip != 'true'
         run: npm publish --provenance --access public
