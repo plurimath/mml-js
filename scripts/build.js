@@ -1,6 +1,6 @@
 // Build script for @plurimath/mml.
 //
-// Clones plurimath/mml at RUBY_REF (default: MML_REF below), runs
+// Clones plurimath/mml at RUBY_REF (default: latest RubyGems release), runs
 // scripts/build.rb which uses Opal::Builder to compile lib/mml/opal
 // into both external and self-contained flavors. lutaml-model is not
 // compiled here: it comes from the @lutaml/lutaml-model package.
@@ -12,11 +12,7 @@ const ROOT = process.cwd();
 const DIST = path.join(ROOT, "dist");
 const TMP = path.join(ROOT, ".tmp");
 
-// The plurimath/mml ref built by default. It is pinned rather than
-// derived from this package's version because no mml release has
-// lib/mml/opal.rb yet; bump MML_REF to the first release that has it.
-const MML_REF = "v2.4.2";
-const RUBY_REF = process.env.RUBY_REF || MML_REF;
+const RUBY_REF = process.env.RUBY_REF || `v${latestGemVersion("mml")}`;
 const RUBY_REPO =
   process.env.RUBY_REPO || "https://github.com/plurimath/mml.git";
 
@@ -31,6 +27,14 @@ function run(cmd, args, opts = {}) {
     console.error(`command failed: ${line}`);
     process.exit(1);
   }
+}
+
+function latestGemVersion(name) {
+  const url = `https://rubygems.org/api/v1/versions/${name}/latest.json`;
+  // --max-time bounds the lookup so a stalled RubyGems fails the build
+  // instead of hanging it until the CI job timeout.
+  const out = run("curl", ["-fsSL", "--max-time", "60", url], { stdio: ["ignore", "pipe", "inherit"] });
+  return JSON.parse(out).version;
 }
 
 function rmrf(p) { fs.rmSync(p, { recursive: true, force: true }); }
